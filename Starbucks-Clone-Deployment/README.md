@@ -82,13 +82,133 @@ Steps:
     - Name: monitering-server
     - Use the sane security-group and key-pair
     - Access the instance via terminal
+        - chmod 400 "deploying-starbucks-key-pair.pem"
+        - ssh -i "deploying-starbucks-key-pair.pem" ubuntu@13.39.242.27
 
 10) Configure monitoring tools
     - Install Prometheus run the commands
-    - Open the :9090
+    - Open with http://15.236.35.79:9090
     - Install Node Explorer
     - Complete node_explorer.service file
-    - Configure prometheus.yml
+    - Configure prometheus.yml, adding two new jobs: node_explorer and jenkins. In the main directory
+    - Go to Targets in the Prometheus
+    - Install Grafana using commands
+    - Access the Grafana using http://15.236.35.79:9090
+    - Add data-source option
+    - Select Prometheus
+    - In Prometheus URL, add http://15.236.35.79:9090. Save and test
+    - Go to Dashboards, import 1860 dashboard (https://grafana.com/grafana/dashboards/1860-node-exporter-full/) and select Prometheus
+    - Verify that the graphics are shown and save the dashboard
+    - Get the Jenkins Grafana Dashboard Id 9964: https://grafana.com/grafana/dashboards/9964-jenkins-performance-and-health-overview/
+    - Create Grafana dashboard and save it
+
+11) Create EKS (Use https://github.com/yeshwanthlm/Learn-AWS-EKS/blob/main/Day1.md)
+    - Install eksctl in command line using:
+        brew tap weaveworks/tap
+        brew install eksctl
+    - It's necessary to exist a IAM with the correct permissions
+    - Run command:
+        - eksctl create cluster --name=monogkai \
+            --region=eu-west-3 \
+            --zones=eu-west-3a,eu-west-3b \
+            --without-nodegroup \
+            --profile monokai
+        - eksctl get cluster
+    - Error occurred
+        - Remove Elastic IPs
+        - It was necessary the complete the ~/.aws/config, and add monokai. Not using the default one
+    - Run command
+        - eksctl utils associate-iam-oidc-provider \
+            --region eu-west-3 \
+            --cluster monogkai \
+            --approve --profile monokai
+    - Run command
+        - eksctl utils associate-iam-oidc-provider \
+            --region eu-west-3 \
+            --cluster monogkai \
+            --approve
+        - eksctl utils associate-iam-oidc-provider --region eu-west-3 --cluster monogkai --approve --profile monokai
+    - Run command
+        eksctl create nodegroup --cluster=monogkai \
+            --region=eu-west-3 \
+            --name=monokai-ng-public1 \
+            --node-type=t3.medium \
+            --nodes=2 \
+            --nodes-min=2 \
+            --nodes-max=4 \
+            --node-volume-size=20 \
+            --ssh-access \
+            --ssh-public-key=deploying-starbucks-key-pair \
+            --managed \
+            --asg-access \
+            --external-dns-access \
+            --full-ecr-access \
+            --appmesh-access \
+            --alb-ingress-access --profile monokai
+    - Use http://13.39.242.27:3000/ to see the application
+    - Use "kubectl get nodes" to verify the existing nodes
+
+12) Monitor Kubernetes with Prometheus
+    - Use https://archive.eksworkshop.com/intermediate/290_argocd/install/
+    -   Install ArgoCD
+        - kubectl create namespace argocd
+        - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.4.7/manifests/install.yaml
+        - kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+        - kubectl get pods -n argocd
+    - Add the Prometheus Community Helm repository
+        - brew install helm
+        - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        - kubectl create namespace prometheus-node-exporter
+        - helm install prometheus-node-exporter prometheus-community/prometheus-node-exporter --namespace prometheus-node-exporter
+        - export ARGOCD_SERVER=`kubectl get svc argocd-server -n argocd -o json | jq --raw-output '.status.loadBalancer.ingress[0].hostname'`
+        - echo $ARGOCD_SERVER
+        - Browser "a301e07d69fcf42b688a5206c56b1f7b-139841734.eu-west-3.elb.amazonaws.com"
+        - export ARGO_PWD=`kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
+        - echo $ARGO_PWD
+        - Use the username admin and the password to login
+        - Manage repositories
+        - Connector repository using HTTPS:
+            - Type: Git
+            - Repository URL: https://github.com/yeshwanthlm/Prime-Video-Clone-Deployment.git
+            - Connect
+        - Create a new app:
+            - Application name: starbucks
+            - Sync policy: Automatic
+            - Source Repository URL: https://github.com/yeshwanthlm/Prime-Video-Clone-Deployment.git
+            - Destination Cluster URL: https://kubernetes.default.svc
+            - Destination Path: Kubernetes (the name of folder inside the repository)
+            - Create
+            - Verify the files inside the Kubernetes folder,  files
+        - Update prometheus.yml file
+            - Add new job for Prometheus
+        - Add Port 30001 inbound rule in the "monogkai-monokai-ng-public1-Node"
+        - Browser http://13.38.17.202:30001/
+        - Add Port 9100 inbound rule in the "monogkai-monokai-ng-public1-Node" and then verify the Prometheus Targets
+
+13) Delete Node Group
+    # List EKS Clusters
+    eksctl get clusters
+
+    # Capture Node Group name
+    eksctl get nodegroup --cluster=<clusterName>
+    eksctl get nodegroup --cluster=amcdemo
+
+    # Delete Node Group
+    eksctl delete nodegroup --cluster=<clusterName> --name=<nodegroupName>
+    eksctl delete nodegroup --cluster=amcdemo --name=amcdemo-ng-public
+
+14) Delete Cluster
+    # Delete Cluster
+    eksctl delete cluster <clusterName>
+    eksctl delete cluster amcdemo
+
+    1:41:28
+    https://www.youtube.com/watch?v=uaiuUGg5gLE&t=862s
+    http://13.39.242.27:8080/job/amazon-starbucks/
+    http://15.236.35.79:9090/targets?search=
+    http://15.236.35.79:3000/d/rYdddlPWk/node-exporter-full?from=now-30m&to=now&timezone=browser&var-datasource=de21kbc03rq4gf&var-job=node_exporter&var-node=15.236.35.79:9100&var-diskdevices=%5Ba-z%5D%2B%7Cnvme%5B0-9%5D%2Bn%5B0-9%5D%2B%7Cmmcblk%5B0-9%5D%2B&refresh=1m
+    https://github.com/yeshwanthlm/Prime-Video-Clone-Deployment
+
 
 ## References
 - https://www.youtube.com/watch?v=uaiuUGg5gLE&t=862s

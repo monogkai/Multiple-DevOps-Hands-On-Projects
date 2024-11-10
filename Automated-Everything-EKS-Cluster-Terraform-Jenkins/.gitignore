@@ -1,3 +1,6 @@
+#Local variables
+.env
+
 # Exclude Terraform state files
 terraform.tfstate
 terraform.tfstate.backup
@@ -7,7 +10,11 @@ terraform.tfstate.backup
 
 # Exclude the Terraform lock file
 .terraform.lock.hcl
+.terraform.tfstate.lock.info
 
 # Exclude the Ansible files
 initialAdminPassword
 inventory.ini
+
+# Exclue IP Saved
+ip-saved

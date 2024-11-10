@@ -49,5 +49,5 @@
     - name: Retrieve initialAdminPassword file
       fetch:
         src: /var/lib/jenkins/secrets/initialAdminPassword
-        dest: "{{ playbook_dir }}/initialAdminPassword"
+        dest: ../jenkins/initialAdminPassword
         flat: yes
